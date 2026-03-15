@@ -59,7 +59,7 @@ def parse_job_request(text: str) -> dict | None:
     client = _get_client()
     try:
         response = client.chat(
-            model="command-r-plus",
+            model="command-r-plus-08-2024",
             messages=[
                 {"role": "system", "content": PARSE_SYSTEM},
                 {"role": "user",   "content": text},
@@ -101,7 +101,7 @@ def explain_top_match(job_summary: str, provider: dict) -> str:
     )
     try:
         response = client.chat(
-            model="command-r-plus",
+            model="command-r-plus-08-2024",
             messages=[
                 {"role": "system", "content": EXPLAIN_SYSTEM},
                 {"role": "user",   "content": prompt},
@@ -135,7 +135,7 @@ def enhance_job_description(raw_desc: str, category: str) -> str:
     prompt = f"Service type: {category}\nRaw description: {raw_desc}"
     try:
         response = client.chat(
-            model="command-r-plus",
+            model="command-r-plus-08-2024",
             messages=[
                 {"role": "system", "content": ENHANCE_SYSTEM},
                 {"role": "user",   "content": prompt},
