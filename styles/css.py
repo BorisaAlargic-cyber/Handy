@@ -27,7 +27,6 @@ div[data-testid="stMarkdownContainer"] p {
     color: #1a1a2e !important;
 }
 
-/* Streamlit v1.3+ label selectors */
 .stTextInput > label,
 .stTextArea > label,
 .stSelectbox > label,
@@ -138,6 +137,67 @@ div[data-testid="stMarkdownContainer"] p {
     font-family: 'DM Serif Display', serif;
     font-size: 1.6rem;
     margin-bottom: 8px;
+}
+
+/* ── AI parsed params display ── */
+.ai-parse-box {
+    background: #eef6ff;
+    border: 1.5px solid #b3d4ff;
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+.ai-label {
+    font-weight: 600;
+    color: #1a5fb4;
+    font-size: 0.85rem;
+    margin-right: 4px;
+}
+.ai-chip {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* ── AI match explanation box ── */
+.ai-explain-box {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d2d50 100%);
+    border: 1.5px solid #e8c547;
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+.ai-explain-title {
+    font-weight: 700;
+    color: #e8c547;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+}
+.ai-explain-body {
+    color: #d0d0e8;
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+/* ── AI enhance box (booking page) ── */
+.ai-enhance-box {
+    background: #f0fdf4;
+    border: 1.5px solid #86efac;
+    border-radius: 10px;
+    padding: 10px 14px 4px 14px;
+    margin-bottom: 4px;
+}
+.ai-enhance-title {
+    font-weight: 600;
+    color: #15803d;
+    font-size: 0.85rem;
 }
 </style>
 """, unsafe_allow_html=True)

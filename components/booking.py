@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from data.providers import SAMPLE_REVIEWS, HOURS_MAP, TIME_SLOTS
 from utils.matching import get_score_breakdown
+from utils.llm import enhance_job_description
 
 
 DAY_MAP = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -43,24 +44,55 @@ def render_booking(go_to):
     with col1:
         st.markdown('<div class="section-title">Your Details</div>', unsafe_allow_html=True)
 
-        name     = st.text_input("Your full name")
-        address  = st.text_input("Service address")
-        _        = st.text_input("Phone number")
+        name    = st.text_input("Your full name")
+        address = st.text_input("Service address")
+        _       = st.text_input("Phone number")
+
+        # Pre-fill job description from AI search if available
+        ai_default = ""
+        if "ai_parsed" in st.session_state:
+            ai_default = st.session_state["ai_parsed"].get("job_summary", "")
+
         job_desc = st.text_area(
             "Describe the job",
+            value=ai_default,
             placeholder="e.g. Fix a leaking pipe under the kitchen sink…",
             height=100,
-        )
-        job_size = st.select_slider(
-            "Estimated job size",
-            options=list(HOURS_MAP.keys()),
+            key="raw_job_desc",
         )
 
+        # ── Feature 2: AI Job Description Enhancer ────────────────────────────
+        enhance_clicked = st.button("✨ Enhance with AI", help="Rewrite your description into a clear professional brief for the provider")
+
+        if enhance_clicked and job_desc.strip():
+            with st.spinner("Polishing your job description..."):
+                enhanced = enhance_job_description(job_desc.strip(), p["category"])
+            st.session_state["enhanced_desc"] = enhanced
+
+        if "enhanced_desc" in st.session_state:
+            st.markdown("""
+            <div class="ai-enhance-box">
+                <div class="ai-enhance-title">✅ AI-Enhanced Job Brief</div>
+            </div>
+            """, unsafe_allow_html=True)
+            enhanced_desc = st.text_area(
+                "Enhanced description (editable)",
+                value=st.session_state["enhanced_desc"],
+                height=120,
+                key="enhanced_job_desc",
+                label_visibility="collapsed",
+            )
+            st.caption("This is the description that will be sent to the provider. You can edit it freely.")
+            final_desc = enhanced_desc
+        else:
+            final_desc = job_desc
+
+        job_size  = st.select_slider("Estimated job size", options=list(HOURS_MAP.keys()))
         est_hours = HOURS_MAP[job_size]
         est_cost  = est_hours * p["price"]
         st.metric("Estimated cost", f"€{est_cost}", f"~{est_hours}h × €{p['price']}/hr")
 
-    # ── Right: slot picker + AI breakdown ────────────────────────────────────
+    # ── Right: slot picker + score breakdown ──────────────────────────────────
     with col2:
         st.markdown('<div class="section-title">Pick a Slot</div>', unsafe_allow_html=True)
 
@@ -68,7 +100,6 @@ def render_booking(go_to):
         booking_date = _next_date_for_day(selected_day)
         st.caption(f"Next available: **{booking_date.strftime('%A, %d %B %Y')}**")
 
-        # Simulate some taken slots
         random.seed(p["id"])
         taken           = random.sample(TIME_SLOTS, 3)
         available_slots = [t for t in TIME_SLOTS if t not in taken]
@@ -89,7 +120,7 @@ def render_booking(go_to):
     # ── Confirm button ────────────────────────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("✅ Confirm Booking", use_container_width=True, type="primary"):
-        if name and address and job_desc:
+        if name and address and final_desc:
             st.session_state.booking_confirmed = True
         else:
             st.warning("Please fill in your name, address and job description.")
@@ -114,5 +145,9 @@ def render_booking(go_to):
 
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("← Back to home", use_container_width=True):
+            # Clean up AI state for next search
+            st.session_state.pop("ai_parsed", None)
+            st.session_state.pop("ai_job_text", None)
+            st.session_state.pop("enhanced_desc", None)
             go_to("home")
             st.rerun()
