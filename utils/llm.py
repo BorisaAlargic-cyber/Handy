@@ -1,17 +1,18 @@
 """
-LLM utilities for Handy – two non-trivial LLM features:
+LLM utilities for Handy – two non-trivial LLM features using Cohere API.
 
 Feature 1 – Natural language job parsing (multi-call, structured output):
-  parse_job_request(text) → dict with extracted search parameters
-  explain_top_match(job_summary, provider) → string narrative
+  parse_job_request(text) -> dict with extracted search parameters
+  explain_top_match(job_summary, provider) -> string narrative
 
 Feature 2 – Job description enhancer (booking page):
-  enhance_job_description(raw_desc, category) → polished professional brief
+  enhance_job_description(raw_desc, category) -> polished professional brief
 """
 
 import json
 import os
-import anthropic
+import cohere
+import streamlit as st
 
 _client = None
 
@@ -19,8 +20,8 @@ _client = None
 def _get_client():
     global _client
     if _client is None:
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        _client = anthropic.Anthropic(api_key=api_key)
+        api_key = st.secrets.get("COHERE_API_KEY", os.environ.get("COHERE_API_KEY", ""))
+        _client = cohere.ClientV2(api_key=api_key)
     return _client
 
 
@@ -37,17 +38,17 @@ Return ONLY valid JSON — no markdown, no explanation, no backticks — with th
   "max_distance":  integer km (default 5 if not mentioned),
   "preferred_day": one of ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"] (best guess from context, default "Mon"),
   "min_rating":    float between 4.0 and 5.0 (default 4.5 if not mentioned),
-  "job_summary":   string, 1–2 sentence plain-English summary of the job
+  "job_summary":   string, 1-2 sentence plain-English summary of the job
 }
 
 Rules:
-- Infer category from job description keywords (e.g. pipe/leak/boiler → Plumber, wiring/fuse/socket → Electrician)
+- Infer category from job description keywords (e.g. pipe/leak/boiler -> Plumber, wiring/fuse/socket -> Electrician)
 - If multiple categories fit, pick the most specific one
-- "today","urgent","emergency","ASAP","right now" → urgency = "ASAP (today/tomorrow)"
-- "this week","soon","few days" → urgency = "This week"
-- No time pressure mentioned → urgency = "Flexible"
-- Budget/price hints: "cheap","budget" → max_price=35; "don't mind paying" → max_price=90
-- Nearby/close → max_distance=2; no preference → max_distance=5"""
+- "today","urgent","emergency","ASAP","right now" -> urgency = "ASAP (today/tomorrow)"
+- "this week","soon","few days" -> urgency = "This week"
+- No time pressure mentioned -> urgency = "Flexible"
+- Budget/price hints: "cheap","budget" -> max_price=35; "don't mind paying" -> max_price=90
+- Nearby/close -> max_distance=2; no preference -> max_distance=5"""
 
 
 def parse_job_request(text: str) -> dict | None:
@@ -57,22 +58,29 @@ def parse_job_request(text: str) -> dict | None:
     """
     client = _get_client()
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=400,
-            system=PARSE_SYSTEM,
-            messages=[{"role": "user", "content": text}],
+        response = client.chat(
+            model="command-r-plus",
+            messages=[
+                {"role": "system", "content": PARSE_SYSTEM},
+                {"role": "user",   "content": text},
+            ],
         )
-        raw = response.content[0].text.strip()
-        return json.loads(raw)
-    except Exception:
+        raw = response.message.content[0].text.strip()
+        # Strip markdown code fences if model adds them anyway
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
+    except Exception as e:
+        st.error(f"Debug: {e}")
         return None
 
 
 # ── FEATURE 1b: Generate personalised match explanation ────────────────────────
 
 EXPLAIN_SYSTEM = """You are a concise, helpful assistant for Handy, a home-services marketplace.
-Given a job request and the top-matched provider, write a 2–3 sentence explanation of why
+Given a job request and the top-matched provider, write a 2-3 sentence explanation of why
 this provider is the best match. Be specific: reference the job details, the provider's
 specialisms, tags, experience and price. Keep it warm and reassuring. No markdown, plain text."""
 
@@ -92,13 +100,14 @@ def explain_top_match(job_summary: str, provider: dict) -> str:
         f"Bio: {provider['bio']}"
     )
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=200,
-            system=EXPLAIN_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
+        response = client.chat(
+            model="command-r-plus",
+            messages=[
+                {"role": "system", "content": EXPLAIN_SYSTEM},
+                {"role": "user",   "content": prompt},
+            ],
         )
-        return response.content[0].text.strip()
+        return response.message.content[0].text.strip()
     except Exception:
         return ""
 
@@ -112,7 +121,7 @@ professional job brief that a tradesperson would find useful.
 Rules:
 - Keep it under 80 words
 - Use plain, direct language — no fluff
-- Structure: what the problem is → what needs doing → any relevant details (location in home, symptoms, urgency)
+- Structure: what the problem is -> what needs doing -> any relevant details (location in home, symptoms, urgency)
 - Do NOT invent details that weren't mentioned
 - Return plain text only, no markdown, no bullet points"""
 
@@ -125,12 +134,13 @@ def enhance_job_description(raw_desc: str, category: str) -> str:
     client = _get_client()
     prompt = f"Service type: {category}\nRaw description: {raw_desc}"
     try:
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=200,
-            system=ENHANCE_SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
+        response = client.chat(
+            model="command-r-plus",
+            messages=[
+                {"role": "system", "content": ENHANCE_SYSTEM},
+                {"role": "user",   "content": prompt},
+            ],
         )
-        return response.content[0].text.strip()
+        return response.message.content[0].text.strip()
     except Exception:
         return raw_desc
